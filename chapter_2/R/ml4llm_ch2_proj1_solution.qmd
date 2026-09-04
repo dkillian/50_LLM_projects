@@ -1,0 +1,217 @@
+---
+title: "Project 1: Three Tokenization Schemes"
+subtitle: "50 ML Projects to Understand LLMs — Chapter 2"
+author: "R translation of Mike X Cohen's original Python notebook"
+date: today
+format:
+  html:
+    toc: true
+    code-fold: false
+    theme: cosmo
+execute:
+  warning: false
+  message: false
+---
+
+*Using the code without reading the book may lead to confusion or errors.*
+
+---
+
+```{r global_options, include=F, warning=F, message=F, echo=F, error=F}
+library(here)
+library(knitr)
+source("../../../prep (May 2025).r")
+```
+
+---
+
+# Part 1: Character-Based Tokenization
+
+```{r}
+#| label: char-setup
+# Start with a text string
+txt <- "The way you do anything is the way you do everything."
+
+# Split into individual characters
+characters <- strsplit(txt, "")[[1]]
+
+cat("The full text:\n", txt, "\n\n")
+cat("As a vector of characters:\n")
+print(characters)
+
+# Build the vocabulary (sorted unique characters)
+char_vocab <- sort(unique(characters))
+
+cat("\nThe vocabulary is:\n")
+print(char_vocab)
+
+cat(sprintf(
+  "\nThere are %d characters, %d of which are unique.\n",
+  length(characters), length(char_vocab)
+))
+```
+
+```{r}
+#| label: char-vocab-table
+# Display token–index mapping in a table
+data.frame(
+  Index = seq_along(char_vocab) - 1L,
+  Token = char_vocab
+) |>
+  t() |>
+  as.data.frame() |>
+  knitr::kable(col.names = NULL)
+```
+
+```{r}
+#| label: char-encode
+# Encode: map each character to its index in the vocab (0-indexed)
+tokens_char <- match(characters, char_vocab) - 1L
+print(tokens_char)
+```
+
+```{r}
+#| label: fig-char-scatter
+#| fig-cap: "Character-level token indices for the example sentence."
+#| fig-width: 12
+#| fig-height: 4
+df_char <- data.frame(
+  position = seq_along(tokens_char) - 1L,
+  token    = tokens_char
+)
+
+ggplot(df_char, aes(x = position, y = token)) +
+  geom_point(shape = 22, size = 4, fill = "#b3b3e5", color = "black") +
+  scale_y_continuous(
+    breaks   = seq_along(char_vocab) - 1L,
+    sec.axis = sec_axis(~ ., breaks = seq_along(char_vocab) - 1L,
+                        labels = char_vocab)
+  ) +
+  labs(x = "Character index", y = NULL) +
+  theme_classic() +
+  theme(panel.grid.major.y = element_line(linetype = "dashed", color = "grey70"))
+```
+
+---
+
+# Part 2: Word-Based Tokenization
+
+```{r}
+#| label: word-setup
+# Split the text into words on whitespace
+words <- strsplit(txt, "\\s+")[[1]]
+
+cat("The list of words is:\n")
+print(words)
+
+# Build the word vocabulary
+word_vocab <- sort(unique(words))
+
+cat(sprintf(
+  "\nThere are %d words, %d of which are unique.\n",
+  length(words), length(word_vocab)
+))
+
+cat("\nThe vocab is:\n")
+print(word_vocab)
+```
+
+```{r}
+#| label: word-encode
+# Encode: map each word to its vocab index (0-indexed)
+tokens_word <- match(words, word_vocab) - 1L
+print(tokens_word)
+```
+
+```{r}
+#| label: fig-word-scatter
+#| fig-cap: "Word-level token indices for the example sentence."
+#| fig-width: 10
+#| fig-height: 3
+df_word <- data.frame(
+  position = seq_along(tokens_word) - 1L,
+  token    = tokens_word
+)
+
+ggplot(df_word, aes(x = position, y = token)) +
+  geom_point(shape = 22, size = 5, fill = "#b3b3e5", color = "black") +
+  scale_y_continuous(
+    breaks   = seq_along(word_vocab) - 1L,
+    sec.axis = sec_axis(~ ., breaks = seq_along(word_vocab) - 1L,
+                        labels = word_vocab)
+  ) +
+  labs(x = "Word index", y = NULL) +
+  theme_classic() +
+  theme(panel.grid.major.y = element_line(linetype = "dashed", color = "grey70"))
+```
+
+---
+
+# Part 3: OpenAI's GPT-2 Tokenizer
+
+This section uses the [`tok`](https://cran.r-project.org/package=tok) package,
+which provides R bindings to HuggingFace's `tokenizers` library.
+
+```{r}
+#| label: gpt2-load
+library(tok)
+
+# Use tok::tokenizer to reference the class, not any instance variable
+tokenizer <- tok::tokenizer$from_pretrained("gpt2")
+tokenizer$get_vocab_size()
+```
+
+```{r}
+#| label: gpt2-encode
+gpt2_tokens <- tokenizer$encode(txt)$ids
+
+# Print each token alongside its decoded string
+for (token in gpt2_tokens) {
+  decoded <- tokenizer$decode(token)
+  cat(sprintf('Token %4d is "%s"\n', token, decoded))
+}
+```
+
+```{r}
+#| label: gpt2-leading-spaces
+# Demonstrate how leading spaces affect tokenization
+word1 <- " Mike"
+word2 <- "Mike"
+
+for (w in c(word1, word2)) {
+  ids <- tokenizer$encode(w)$ids
+  cat(sprintf('Token for "%s" is %s\n', w, paste(ids, collapse = ", ")))
+}
+```
+
+```{r}
+#| label: gpt2-counts
+cat(sprintf(
+  "There are %d tokens, %d of which are unique.\n",
+  length(gpt2_tokens), length(unique(gpt2_tokens))
+))
+```
+
+```{r}
+#| label: fig-comparison
+#| fig-cap: "Comparison of total and unique token counts across the three tokenization schemes."
+#| fig-width: 10
+#| fig-height: 3.5
+counts <- data.frame(
+  scheme = factor(
+    rep(c("Characters", "Words", "GPT-2"), 2),
+    levels = c("Characters", "Words", "GPT-2")
+  ),
+  type  = rep(c("Total", "Unique"), each = 3),
+  count = c(
+    length(characters), length(words), length(gpt2_tokens),
+    length(char_vocab), length(word_vocab), length(unique(gpt2_tokens))
+  )
+)
+
+ggplot(counts, aes(x = scheme, y = count)) +
+  geom_col() +
+  facet_wrap(~ type) +
+  labs(x = NULL, y = "Count") +
+  theme_classic()
+```

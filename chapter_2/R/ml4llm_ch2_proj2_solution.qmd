@@ -1,0 +1,205 @@
+---
+title: "Project 2: Book Lengths in Characters, Words, and Tokens"
+subtitle: "50 ML Projects to Understand LLMs — Chapter 2"
+author: "R translation of Mike X Cohen's original Python notebook"
+date: today
+format:
+  html:
+    toc: true
+    code-fold: false
+    theme: cosmo
+execute:
+  warning: false
+  message: false
+---
+
+*Using the code without reading the book may lead to confusion or errors.*
+
+---
+
+```{r global_options, include=F, warning=F, message=F, echo=F, error=F}
+library(here)
+library(knitr)
+source("../../../prep (May 2025).r")
+```
+
+---
+
+# How to Import a Book from gutenberg.org
+
+```{r}
+#| label: gutenberg-demo
+url  <- "https://www.gutenberg.org/cache/epub/84/pg84.txt"
+text <- readLines(url, encoding = "UTF-8") |> paste(collapse = "\n")
+cat(substr(text, 1, 500))
+```
+
+---
+
+# Setup: Books and Tokenizer
+
+```{r}
+#| label: books-and-tokenizer
+baseurl <- "https://www.gutenberg.org/cache/epub/"
+
+books <- data.frame(
+  code  = c("84", "64317", "11",   "1513",       "76",
+            "219",         "2591",       "2148",          "36",           "829"),
+  title = c("Frankenstein", "GreatGatsby", "AliceWonderland", "RomeoJuliet", "HuckFinn",
+            "HeartDarkness", "GrimmsTales", "EdgarAllenPoe", "WarOfTheWorlds", "GulliversTravels")
+)
+
+# Load GPT-2 tokenizer (downloads vocab on first run)
+gpt2 <- tok::tokenizer$from_pretrained("gpt2")
+```
+
+---
+
+# Part 1: Total Characters, Words, and Tokens
+
+```{r}
+#| label: part1-counts
+#| cache: true
+results <- vector("list", nrow(books))
+
+for (i in seq_len(nrow(books))) {
+  fullurl <- paste0(baseurl, books$code[i], "/pg", books$code[i], ".txt")
+  text    <- readLines(fullurl, encoding = "UTF-8") |> paste(collapse = "\n")
+
+  results[[i]] <- data.frame(
+    title   = books$title[i],
+    n_chars = nchar(text),
+    n_words = length(strsplit(trimws(text), "\\s+")[[1]]),
+    n_token = length(gpt2$encode(text)$ids)
+  )
+}
+
+counts <- bind_rows(results)
+counts
+```
+
+---
+
+# Part 2: Unique and Total Counts
+
+```{r}
+#| label: part2-unique
+#| cache: true
+full_results <- vector("list", nrow(books))
+
+for (i in seq_len(nrow(books))) {
+  fullurl <- paste0(baseurl, books$code[i], "/pg", books$code[i], ".txt")
+  text    <- readLines(fullurl, encoding = "UTF-8") |> paste(collapse = "\n")
+
+  chars  <- strsplit(text, "")[[1]]
+  words  <- strsplit(trimws(text), "\\s+")[[1]]
+  tokens <- gpt2$encode(text)$ids
+
+  full_results[[i]] <- data.frame(
+    title        = books$title[i],
+    total_chars  = length(chars),
+    unique_chars = length(unique(chars)),
+    total_words  = length(words),
+    unique_words = length(unique(words)),
+    total_token  = length(tokens),
+    unique_token = length(unique(tokens))
+  )
+}
+
+full_counts <- bind_rows(full_results)
+```
+
+```{r}
+#| label: fig-part2
+#| fig-cap: "Total (A) and unique (B) counts across tokenization schemes for 10 Project Gutenberg books."
+#| fig-width: 10
+#| fig-height: 3.5
+
+# Reshape to long format for plotting
+long_counts <- full_counts |>
+  pivot_longer(
+    cols      = -title,
+    names_to  = c("measure", "scheme"),
+    names_sep = "_",
+    values_to = "count"
+  ) |>
+  mutate(
+    scheme  = factor(tools::toTitleCase(scheme), levels = c("Chars", "Words", "Token")),
+    measure = if_else(measure == "total", "A) Total", "B) Unique")
+  )
+
+ggplot(long_counts, aes(x = scheme, y = count)) +
+  geom_jitter(width = 0.08, size = 2.5) +
+  stat_summary(fun = mean, geom = "crossbar", width = 0.6,
+               linewidth = 0.8, color = "steelblue") +
+  scale_y_continuous(labels = scales::label_scientific()) +
+  facet_wrap(~ measure, scales = "free_y") +
+  labs(x = NULL, y = "Count") +
+  theme_classic() +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(face = "bold"))
+```
+
+---
+
+# Part 3: Unique by Total Counts
+
+```{r}
+#| label: fig-part3
+#| fig-cap: "Relationship between unique and total counts for each tokenization scheme across 10 books."
+#| fig-width: 12
+#| fig-height: 3.5
+
+# Build a long frame with both total and unique per scheme
+scatter_data <- full_counts |>
+  select(title,
+         chars_total  = total_chars,  chars_unique  = unique_chars,
+         words_total  = total_words,  words_unique  = unique_words,
+         token_total  = total_token,  token_unique  = unique_token) |>
+  pivot_longer(
+    cols      = -title,
+    names_to  = c("scheme", "measure"),
+    names_sep = "_"
+  ) |>
+  pivot_wider(names_from = measure, values_from = value) |>
+  mutate(scheme = factor(tools::toTitleCase(scheme),
+                         levels = c("Chars", "Words", "Token")))
+
+# Compute per-scheme correlation labels
+cor_labels <- scatter_data |>
+  group_by(scheme) |>
+  summarise(r = cor(unique, total), .groups = "drop") |>
+  mutate(label = sprintf("r = %.2f", r))
+
+ggplot(scatter_data, aes(x = unique, y = total)) +
+  geom_point(size = 3) +
+  geom_text(data = cor_labels, aes(label = label),
+            x = -Inf, y = Inf, hjust = -0.2, vjust = 1.5,
+            fontface = "bold", inherit.aes = FALSE) +
+  scale_x_continuous(labels = scales::label_scientific()) +
+  scale_y_continuous(labels = scales::label_scientific()) +
+  facet_wrap(~ scheme, scales = "free") +
+  labs(x = "Unique", y = "Total") +
+  theme_classic() +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(face = "bold"))
+```
+
+```{r}
+#| label: outlier
+# Which book has the most unique characters?
+full_counts |>
+  slice_max(unique_chars, n = 1) |>
+  select(title, unique_chars)
+```
+
+```{r}
+#| label: outlier-chars
+# Inspect the full character set of the outlier book (EdgarAllenPoe)
+text_poe <- readLines(
+  "https://www.gutenberg.org/cache/epub/2148/pg2148.txt",
+  encoding = "UTF-8"
+) |> paste(collapse = "\n")
+
+sort(unique(strsplit(text_poe, "")[[1]]))
+```
