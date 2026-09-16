@@ -35,49 +35,59 @@ txt <- "The way you do anything is the way you do everything."
 # Split into individual characters
 characters <- strsplit(txt, "")[[1]]
 
+characters
+
+```
+
+```{r}
+
 cat("The full text:\n", txt, "\n\n")
-cat("As a vector of characters:\n")
+cat("As a vector of characters:\n", characters)
 print(characters)
 
 # Build the vocabulary (sorted unique characters)
 char_vocab <- sort(unique(characters))
 
-cat("\nThe vocabulary is:\n")
-print(char_vocab)
-
 cat(sprintf(
   "\nThere are %d characters, %d of which are unique.\n",
   length(characters), length(char_vocab)
 ))
+
+cat("\nThe vocabulary is:\n", char_vocab)
+
 ```
-Create token index
+Create our own token index
 
 ```{r}
 #| label: char-vocab-table
 # Display token–index mapping in a table
-data.frame(
-  Index = seq_along(char_vocab) - 1L,
-  Token = char_vocab) |> 
+char_vocab_tbl <- data.frame(Index = seq_along(char_vocab),
+                             Token = char_vocab) |> 
     flextable()
 
+char_vocab_tbl
+
 ```
 
-```{r}
-#| label: char-encode
-# Encode: map each character to its index in the vocab (0-indexed)
-tokens_char <- match(characters, char_vocab) - 1L
-print(tokens_char)
-```
+Map each character to its index in the vocab
 
 ```{r}
 #| label: fig-char-scatter
 #| fig-cap: "Character-level token indices for the example sentence."
 #| fig-width: 12
 #| fig-height: 4
+#| 
 df_char <- data.frame(
-  position = seq_along(tokens_char) - 1L,
-  token    = tokens_char
-)
+  position = seq_along(tokens_char),
+  character = characters,
+  token    = match(characters, char_vocab))
+
+df_char %>%
+    flextable()
+
+```
+
+```{r}
 
 ggplot(df_char, aes(x = position, y = token)) +
   geom_point(shape = 22, size = 4, fill = "#b3b3e5", color = "black") +
@@ -90,6 +100,36 @@ ggplot(df_char, aes(x = position, y = token)) +
   theme_classic() +
   theme(panel.grid.major.y = element_line(linetype = "dashed", color = "grey70"))
 ```
+
+Not sure what the point is of this graph. 
+
+```{r}
+
+char_count <- df_char |>
+  count(character) |>
+  mutate(index = match(character, char_vocab)) |>
+  arrange(index)
+
+char_count
+
+```
+
+```{r}
+
+ggplot(char_count, aes(reorder(character, n), n)) +
+    geom_col(fill="dodgerblue2",
+             color="blue",
+             alpha=.8,
+             width=.3) +
+    scale_y_continuous(breaks=1:10,
+                       sec.axis=dup_axis()) +
+    labs(x="",
+         y="",
+         title="Count of unique characters") +
+    theme(axis.title.y=element_text(angle=0, vjust=.55))
+
+```
+
 
 ---
 
