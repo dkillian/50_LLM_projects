@@ -1,7 +1,7 @@
 ---
-title: "Project 1: Three Tokenization Schemes"
-subtitle: "50 ML Projects to Understand LLMs — Chapter 2"
-author: "R translation of Mike X Cohen's original Python notebook"
+title: "Three Tokenization Schemes"
+subtitle: "50 ML Projects to Understand LLMs — Chapter 2, Project 1"
+author: "Dan Killian, with Posit AI<br>an R translation of Mike X Cohen's original Python notebook"
 date: today
 format:
   html:
@@ -29,34 +29,32 @@ source("../../../prep (May 2025).r")
 
 ```{r}
 #| label: char-setup
+
 # Start with a text string
 txt <- "The way you do anything is the way you do everything."
 
 # Split into individual characters
 characters <- strsplit(txt, "")[[1]]
 
-characters
-
-```
-
-```{r}
-
-cat("The full text:\n", txt, "\n\n")
-cat("As a vector of characters:\n", characters)
-print(characters)
-
 # Build the vocabulary (sorted unique characters)
 char_vocab <- sort(unique(characters))
-
-cat(sprintf(
-  "\nThere are %d characters, %d of which are unique.\n",
-  length(characters), length(char_vocab)
-))
-
-cat("\nThe vocabulary is:\n", char_vocab)
-
 ```
-Create our own token index
+
+There are `r length(characters)` characters, `r length(char_vocab)` of which are unique
+
+The full text:
+
+`r txt`
+
+As a vector of characters: 
+
+`r characters`
+
+The vocabulary:  
+`r char_vocab`
+
+
+Create our own character token index
 
 ```{r}
 #| label: char-vocab-table
@@ -78,7 +76,7 @@ Map each character to its index in the vocab
 #| fig-height: 4
 #| 
 df_char <- data.frame(
-  position = seq_along(tokens_char),
+  position = seq_along(characters),
   character = characters,
   token    = match(characters, char_vocab))
 
@@ -87,21 +85,7 @@ df_char %>%
 
 ```
 
-```{r}
-
-ggplot(df_char, aes(x = position, y = token)) +
-  geom_point(shape = 22, size = 4, fill = "#b3b3e5", color = "black") +
-  scale_y_continuous(
-    breaks   = seq_along(char_vocab) - 1L,
-    sec.axis = sec_axis(~ ., breaks = seq_along(char_vocab) - 1L,
-                        labels = char_vocab)
-  ) +
-  labs(x = "Character index", y = NULL) +
-  theme_classic() +
-  theme(panel.grid.major.y = element_line(linetype = "dashed", color = "grey70"))
-```
-
-Not sure what the point is of this graph. 
+How often do characters appear?
 
 ```{r}
 
@@ -110,13 +94,16 @@ char_count <- df_char |>
   mutate(index = match(character, char_vocab)) |>
   arrange(index)
 
-char_count
+char_count %>%
+    flextable()
 
 ```
 
 ```{r}
 
-ggplot(char_count, aes(reorder(character, n), n)) +
+theme_set(base_ppt)
+
+ggplot(char_count, aes(reorder(character, -n), n)) +
     geom_col(fill="dodgerblue2",
              color="blue",
              alpha=.8,
@@ -130,58 +117,84 @@ ggplot(char_count, aes(reorder(character, n), n)) +
 
 ```
 
-
 ---
 
 # Part 2: Word-Based Tokenization
 
 ```{r}
 #| label: word-setup
-# Split the text into words on whitespace
-words <- strsplit(txt, "\\s+")[[1]]
 
-cat("The list of words is:\n")
-print(words)
+# Split the text into words on whitespace
+words <- strsplit(txt, "\\s+")[[1]] # \\s+ means one or more whitespace characters
 
 # Build the word vocabulary
 word_vocab <- sort(unique(words))
 
-cat(sprintf(
-  "\nThere are %d words, %d of which are unique.\n",
-  length(words), length(word_vocab)
-))
+```
 
-cat("\nThe vocab is:\n")
-print(word_vocab)
+There are `r length(words)` words, `r length(word_vocab)` of which are unique
+
+The text:  
+`r words`
+
+The vocab:  
+`r word_vocab`
+
+Note the duplication of 'the' based on capitalization. The period after 'everything' may also mess things up. 
+
+
+Create our own word token index
+
+```{r}
+#| label: word-vocab-table
+# Display token–index mapping in a table
+wrd_vocab_tbl <- data.frame(Index = seq_along(word_vocab),
+                             Token = word_vocab) |> 
+    flextable()
+
+wrd_vocab_tbl
+
+```
+
+Map our token index back to the corpus
+
+```{r}
+
+df_wrd <- tibble(position = seq_along(words),
+                 word=words,
+                 token    = match(words, word_vocab))
+
+df_wrd %>%
+    flextable()
+
+
+```
+How often does each word show up?
+
+```{r}
+wrd_count <- df_wrd |>
+  count(word) |>
+  mutate(index = match(word, word_vocab)) |>
+  arrange(desc(n))
+
+wrd_count %>%
+    flextable()
 ```
 
 ```{r}
-#| label: word-encode
-# Encode: map each word to its vocab index (0-indexed)
-tokens_word <- match(words, word_vocab) - 1L
-print(tokens_word)
-```
 
-```{r}
-#| label: fig-word-scatter
-#| fig-cap: "Word-level token indices for the example sentence."
-#| fig-width: 10
-#| fig-height: 3
-df_word <- data.frame(
-  position = seq_along(tokens_word) - 1L,
-  token    = tokens_word
-)
+ggplot(wrd_count, aes(reorder(word, -n), n)) +
+    geom_col(fill="dodgerblue2",
+             color="blue",
+             alpha=.8,
+             width=.3) +
+    scale_y_continuous(breaks=1:10,
+                       sec.axis=dup_axis()) +
+    labs(x="",
+         y="",
+         title="Count of unique words") +
+    theme(axis.title.y=element_text(angle=0, vjust=.55))
 
-ggplot(df_word, aes(x = position, y = token)) +
-  geom_point(shape = 22, size = 5, fill = "#b3b3e5", color = "black") +
-  scale_y_continuous(
-    breaks   = seq_along(word_vocab) - 1L,
-    sec.axis = sec_axis(~ ., breaks = seq_along(word_vocab) - 1L,
-                        labels = word_vocab)
-  ) +
-  labs(x = "Word index", y = NULL) +
-  theme_classic() +
-  theme(panel.grid.major.y = element_line(linetype = "dashed", color = "grey70"))
 ```
 
 ---
@@ -199,10 +212,13 @@ library(tok)
 tokenizer <- tok::tokenizer$from_pretrained("gpt2")
 tokenizer$get_vocab_size()
 ```
+GPT2 has an existing corpus comprising fifty thousand tokens. 
 
 ```{r}
 #| label: gpt2-encode
 gpt2_tokens <- tokenizer$encode(txt)$ids
+
+# saveRDS(gpt2_tokens, "gpt2_tokens.rds")
 
 # Print each token alongside its decoded string
 for (token in gpt2_tokens) {
@@ -222,6 +238,7 @@ for (w in c(word1, word2)) {
   cat(sprintf('Token for "%s" is %s\n', w, paste(ids, collapse = ", ")))
 }
 ```
+Why allow a separate token for a white space before a name? Is that an oversight?
 
 ```{r}
 #| label: gpt2-counts
@@ -249,15 +266,16 @@ counts <- data.frame(
 )
 
 ggplot(counts, aes(x = scheme, y = count)) +
-  geom_col() +
+  geom_col(width=.4,
+           fill="dodgerblue2",
+           color="blue",
+           alpha=.6) +
   facet_wrap(~ type) +
   labs(x = NULL, y = "Count") +
-  theme_classic()
+  faceted
 ```
 
-# Addendum
-
-## Line-based tokenization
+# Addendum: New corpus
 
 ```{r}
 dig <- "Between my finger and my thumb
@@ -301,19 +319,405 @@ I’ll dig with it."
 
 ```
 
+## Word-based tokenization
+
 ```{r}
+#| label: dig-setup
+# Split the text into words on whitespace
+dig_words <- strsplit(dig, "\\s+") [[1]] # \\s+ means one or more whitespace characters
 
-dig_df <- dig %>%
-    tibble(text = str_split(dig, "\n")[[1]]) |>
-  mutate(
-    is_blank = str_trim(text) == "",
-    stanza = cumsum(is_blank & lag(is_blank | row_number() == 1, default = TRUE)) + 1) |>
-  filter(!is_blank) |>
-  mutate(line = row_number()) |>
-  select(stanza, line, text)
-
-dig_df 
+# Build the word vocabulary
+dig_word_vocab <- sort(unique(dig_words))
 
 ```
+
+There are `r length(dig_words)` words, `r length(dig_word_vocab)` of which are unique
+
+The vocabulary:  
+`r dig_word_vocab`
+
+
+Create our own word token index
+
+```{r}
+#| label: dig-vocab-table
+# Display token–index mapping in a table
+dig_vocab_tbl <- data.frame(Index = seq_along(dig_word_vocab),
+                             Token = dig_word_vocab) |> 
+    flextable()
+
+dig_vocab_tbl
+
+```
+
+
+Map our token index back to the corpus
+
+```{r}
+dig_df <- tibble(position = seq_along(dig_words),
+                 word=dig_words,
+                 token    = match(dig_words, dig_word_vocab))
+
+dig_df %>%
+    flextable()
+```
+
+Count of unique words
+
+```{r}
+dig_count <- dig_df |>
+  count(word) |>
+  mutate(index = match(word, dig_word_vocab)) |>
+  arrange(desc(n))
+
+dig_count %>%
+    flextable()
+```
+
+```{r}
+#| label: digging word count
+#| fig-cap: "Word count: Digging, Seamus Heaney"
+#| fig-width: 4
+#| fig-height: 18
+ggplot(dig_count, aes(n, reorder(word, n))) +
+    geom_col(fill="dodgerblue2",
+             color="blue",
+             alpha=.8,
+             width=.3) +
+    scale_x_continuous(breaks=1:10,
+                       sec.axis=dup_axis()) +
+    labs(x="",
+         y="",
+         title="Count of unique words") +
+    theme(axis.title.y=element_text(angle=0, vjust=.55))
+```
+
+## Line-based tokenization
+
+```{r}
+#| label: dig-setup-line
+# Split the text into words on whitespace
+dig_lines <- strsplit(dig, "\n") [[1]] |>
+    str_subset("\\S")
+
+dig_stanzas <- strsplit(dig, "\n \n")[[1]]   
+
+```
+
+There are `r length(dig_lines)` lines across `r length(dig_stanzas)` stanzas
+
+```{r}
+
+dig_df <- tibble(text = str_split(dig, "\n")[[1]]) |>
+    mutate(is_blank = str_trim(text) == "",
+           stanza = cumsum(lag(is_blank, default = FALSE)) + 1) |>
+    filter(!is_blank) |>
+    mutate(line = row_number()) |>
+    select(stanza, line, text)
+
+dig_df |>
+    flextable()
+
+```
+How might we develop descriptive statistics of lines and stanzas?
+
+```{r}
+line_df <- dig_df |>
+  mutate(
+    word_count = str_count(text, "\\S+"),
+    char_count = nchar(text)
+  )
+
+line_df %>%
+    flextable()
+```
+```{r}
+#| label: tbl-lines
+#| tbl-cap: "Characteristics of poem lines"
+
+line_desc <- describe(line_df[,4:5]) %>%
+    mutate(token_type = c("Words","Characters")) %>%
+    .[,c(14,3, 5,4, 13, 8:9)] 
+
+
+line_desc %>%
+    flextable() %>%
+    flextable::set_caption("Characteristics of poem lines")
+```
+
+```{r}
+stanzas_df <- tibble(stanza=1:8,
+                     text=dig_stanzas) |>
+    group_by(stanza) %>%
+    mutate(word_count = str_count(text, "\\S+"),
+           char_count = nchar(text))
+
+stanzas_df %>%
+    flextable()
+```
+
+```{r}
+#| label: tbl-stanzas
+#| tbl-cap: "Characteristics of poem stanzas"
+
+stanz_desc <- describe(stanzas_df[,3:4]) %>%
+    mutate(token_type = c("Words","Characters")) %>%
+    .[,c(14,3, 5,4, 13, 8:9)] 
+
+
+stanz_desc %>%
+    flextable() %>%
+    flextable::set_caption("Characteristics of poem stanzas")
+```
+
+
+
+## Embeddings
+
+``` {r}
+
+# RUN ONCE, THEN LOAD THE EMBEDDINGS
+
+# library(openai)
+
+# Reads OPENAI_API_KEY from your environment automatically
+# embeddings <- create_embedding(
+#   model = "text-embedding-3-small",
+#   input = dig_df$text
+# )
+# 
+# d <- embeddings$data
+# 
+# # Extract the matrix of vectors
+# # embed_matrix <- sapply(embeddings$data, \(x) x$embedding)
+#     
+# embed_matrix <- do.call(rbind, d$embedding)
+# 
+# # Result: a matrix where each column is the embedding for one line
+# 
+# saveRDS(embed_matrix, "embeddings.rds")
+
+embed_matrix <- readRDS("embeddings.rds")
+
+```
+
+### Cosine similarities between lines
+
+```{r}
+library(lsa)
+
+sim_matrix <- cosine(t(embed_matrix))
+```
+
+```{r}
+sim_matrix |>
+  as.data.frame() |>
+  setNames(seq_len(ncol(sim_matrix))) |>
+  mutate(line_i = row_number()) |>
+  tidyr::pivot_longer(-line_i, names_to = "line_j", values_to = "similarity") |>
+  mutate(line_j = as.integer(line_j)) |>
+  ggplot(aes(line_i, line_j, fill = similarity)) +
+  geom_tile() +
+  scale_fill_distiller(palette = "Blues", direction = 1) +
+  labs(x = "Line", y = "Line", fill = "Cosine\nsimilarity")
+```
+A couple lines overlap and have similarity of 1 or close to it
+
+
+```{r}
+sim_df <- which(upper.tri(sim_matrix), arr.ind = TRUE) |>
+  as.data.frame() |>
+  setNames(c("i", "j")) |>
+  mutate(
+    line_i     = dig_df$text[i],
+    line_j     = dig_df$text[j],
+    similarity = sim_matrix[cbind(i, j)]
+  )
+
+sim_df <- sim_df %>%
+#    group_by(i) %>%
+    arrange(i, desc(similarity))
+```
+
+
+```{r}
+# Extract upper triangle values
+sim_vals <- sim_matrix[upper.tri(sim_matrix)]
+
+sim_desc <- psych::describe(sim_vals) %>%
+    .[,c(1:3, 5,4, 13, 8:9)] 
+
+sim_desc %>%
+    flextable
+```
+
+
+```{r}
+sim_df <- which(upper.tri(sim_matrix), arr.ind = TRUE) |>
+  as.data.frame() |>
+  setNames(c("i", "j")) |>
+  mutate(
+    line_i     = dig_lines[i],
+    line_j     = dig_lines[j],
+    similarity = sim_matrix[cbind(i, j)]
+  ) %>%
+    select(1,3,2,4,5) %>%
+    arrange(i)
+
+sim_df |> flextable()
+```
+
+### Stanza cohesion
+
+Are lines within stanzas different lines in different stanzas?
+
+```{r}
+sim_df |>
+  mutate(
+    stanza_i = dig_df$stanza[i],
+    stanza_j = dig_df$stanza[j],
+    same_stanza = stanza_i == stanza_j
+  ) |>
+  group_by(same_stanza) |>
+  summarise(mean_sim = mean(similarity)) %>%
+    flextable()
+```
+
+No not really 
+
+### Semantic search
+
+How might we query a poem? 
+
+```{r}
+#| cache: true
+
+library(openai)
+
+# Embed the query
+query <- "manual labour and memory"
+
+query_vec <- create_embedding(model = "text-embedding-3-small",
+                              input = query)$data$embedding[[1]] |> 
+    unlist()
+
+# Cosine similarity between query and each line
+cos_sim <- function(a, b) sum(a * b) / (sqrt(sum(a^2)) * sqrt(sum(b^2)))
+
+out <- tibble(
+  stanza = dig_df$stanza,
+  line = dig_df$line,
+  text = dig_df$text,
+  similarity = apply(embed_matrix, 1, \(row) cos_sim(query_vec, row))
+) |>
+  arrange(desc(similarity))
+
+out %>%
+    flextable() %>%
+    flextable::set_caption("query: manual labor and memory")
+```
+
+Write a function to allow us to query the poem with text, and get back the poem lines with highest similarity
+
+```{r}
+search_poem <- function(query, n = 5, lines = dig_df$text, matrix = embed_matrix) {
+  cos_sim <- function(a, b) sum(a * b) / (sqrt(sum(a^2)) * sqrt(sum(b^2)))
+  
+  query_vec <- create_embedding(
+    model = "text-embedding-3-small",
+    input = query
+  )$data$embedding[[1]] |> unlist()
+  
+  tibble(
+    line       = lines,
+    stanza     = dig_df$stanza,
+    similarity = apply(matrix, 1, \(row) cos_sim(query_vec, row))
+  ) |>
+    slice_max(similarity, n = n)              # <- returns tibble, not flextable
+}
+```
+
+
+```{r}
+# q1 <- search_poem("digging and earth")
+
+# saveRDS(q1, "q1.rds")
+
+q1 <- readRDS("q1.rds")
+
+q1 %>% 
+    flextable()
+
+```
+
+```{r}
+# q2 <- search_poem("Japan")
+
+# saveRDS(q2, "q2.rds")
+
+q2 <- readRDS("q2.rds")
+
+q2 %>% 
+    flextable()
+
+```
+
+```{r}
+# q3 <- search_poem("ennui")
+
+# saveRDS(q3, "q3.rds")
+
+q3 <- readRDS("q3.rds")
+
+q3 %>% 
+    flextable()
+```
+
+
+```{r}
+# q4 <- search_poem("reputation")
+
+# saveRDS(q1, "q4.rds")
+
+q4 <- readRDS("q4.rds")
+
+q4 %>% 
+    flextable()
+
+```
+
+
+```{r}
+# q5 <- search_poem("memory")
+
+# saveRDS(q5, "q5.rds")
+
+q5 <- readRDS("q5.rds")
+
+q5 %>% 
+    flextable()
+
+```
+
+
+```{r}
+# q6 <- search_poem("jealousy")
+
+# saveRDS(q6, "q6.rds")
+
+q6 <- readRDS("q6.rds")
+
+q6 %>% 
+    flextable()
+
+```
+
+Interesting
+
+
+
+
+
+
 
 
