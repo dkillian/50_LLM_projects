@@ -5,5 +5,5 @@ This repo is an R translation of the book "50 ML projects to understand LLMs: In
 See https://github.com/mikexcohen/ML4LLM_book for the original repo. 
 
 Chapter 2  
-Project 1: [Three Tokenization Schemes](dkillian.github.io/50_LLM_projects/chapter_2/R/ml4llm_ch2_proj1.html)
+Project 1: [Three Tokenization Schemes](https://dkillian.github.io/50_LLM_projects/chapter_2/R/ml4llm_ch2_proj1.html)
 
