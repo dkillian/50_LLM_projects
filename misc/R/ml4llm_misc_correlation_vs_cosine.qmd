@@ -1,0 +1,26 @@
+---
+title: "Correlation vs. Cosine Similarity"
+subtitle: "50 ML Projects to Understand LLMs — Miscellaneous<br>R translation of Mike X Cohen's Substack post"
+author: "Dan Killian, with Posit AI<br>an R translation of Mike X Cohen's original Python notebook"
+date: today
+format:
+  html:
+    toc: true
+    code-fold: false
+    theme: cosmo
+execute:
+  warning: false
+  message: false
+---
+
+*Using the code without reading the post may lead to confusion or errors.*
+
+---
+
+```{r global_options, include=F, warning=F, message=F, echo=F, error=F}
+library(here)
+library(knitr)
+source("../../../prep (May 2025).r")
+```
+
+---
