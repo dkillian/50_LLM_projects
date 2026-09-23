@@ -8,6 +8,8 @@ format:
     toc: true
     code-fold: false
     theme: cosmo
+    fig-height: 3
+    fig-width: 5
 execute:
   warning: false
   message: false
@@ -17,10 +19,11 @@ execute:
 
 ---
 
-```{r global_options, include=F, warning=F, message=F, echo=F, error=F}
+```{r global_options, include=F, warning=F, message=F, echo=F, error=F, fig.height=3, fig.width=5}
 library(here)
 library(knitr)
 source("../../../prep (May 2025).r")
+theme_set(base_quarto)
 ```
 
 ---
@@ -50,11 +53,16 @@ books <- data.frame(
   code  = c("84",    "64317",       "11",              "1513",        "76",
             "219",          "2591",         "2148",           "36",              "829"),
   title = c("Frankenstein", "GreatGatsby", "AliceWonderland", "RomeoJuliet", "HuckFinn",
-            "HeartDarkness", "GrimmsTales", "EdgarAllenPoe", "WarOfTheWorlds", "GulliversTravels")
-)
+            "HeartDarkness", "GrimmsTales", "EdgarAllenPoe", "WarOfTheWorlds", "GulliversTravels"),
+  label = c("Frankenstein", "The Great Gatsby", "Alice in Wonderland", "Romeo and Juliet", 
+            "Adventures of Huck Finn", "Heart of Darkness", "Grimm's Tales", "Edgar Allan Poe", 
+            "War of the Worlds", "Gullivers Travels")) 
+  
+books %>%
+    flextable()
 
-# Load GPT-2 tokenizer (downloads vocab on first run)
-gpt2 <- tok::tokenizer$from_pretrained("gpt2")
+# Load GPT-2 tokenizer from local file (run gpt2$save("tokenizer.json") once to create it)
+gpt2 <- tok::tokenizer$from_file("tokenizer.json")
 ```
 
 ---
@@ -238,3 +246,141 @@ sort(unique(strsplit(text_poe, "")[[1]]))
 ```
 
 The Poe collection includes accented and non-Latin characters — likely from French or other language quotations embedded in the text — which inflates the unique character count relative to the other books.
+
+# Addendum
+
+Can we query the corpus with a sentence, passage, or keywords, and get back a list of similarity to the books in the corpus? We will embed each book as the average of its chunk embeddings, embed the query, then rank books by cosine similarity to the query.
+
+```{r}
+#| label: semantic-search
+library(reticulate)
+
+# helper: split text into ~500-word chunks
+chunk_text <- function(text, size = 500) {
+  words  <- strsplit(text, "\\s+")[[1]]
+  starts <- seq(1, length(words), by = size)
+  purrr::map_chr(starts, \(s) paste(words[s:min(s + size - 1, length(words))], collapse = " "))
+}
+
+# load model (downloads ~90MB on first run)
+st    <- import("sentence_transformers")
+model <- st$SentenceTransformer("all-MiniLM-L6-v2")
+
+# fetch all book texts
+book_texts <- purrr::map(books$code, \(code) {
+  paste0(baseurl, code, "/pg", code, ".txt") |>
+    readLines(encoding = "UTF-8") |>
+    paste(collapse = "\n")
+})
+
+# embed each book as average of chunk embeddings (save to disk to avoid recomputing)
+emb_path <- "book_emb.rds"
+
+if (file.exists(emb_path)) {
+  book_emb <- readRDS(emb_path)
+} else {
+  book_emb <- purrr::map(book_texts, \(text) {
+    chunks <- chunk_text(text)
+    embs   <- model$encode(chunks)
+    colMeans(embs)
+  })
+  saveRDS(book_emb, emb_path)
+}
+
+# embed query and compute cosine similarity to each book
+query     <- "revenge and obsession"
+query_emb <- model$encode(query)
+
+cos_sim <- purrr::map_dbl(book_emb, \(emb) {
+  sum(query_emb * emb) / (sqrt(sum(query_emb^2)) * sqrt(sum(emb^2)))
+})
+
+out <- tibble(title = books$label, cos_sim = cos_sim) |>
+  arrange(desc(cos_sim)) 
+
+out %>%
+    flextable()
+```
+
+```{r}
+#| fig-height: 4
+#| fig-width: 7
+ggplot(out, aes(cos_sim, reorder(title, cos_sim))) +
+    geom_label(aes(label=round(cos_sim,2)),
+               fill="dodgerblue2",
+               color="white",
+               size=4) +
+    labs(x="Cosine similarity",
+         y="",
+         title=glue::glue("Novel similarity to: {query}"))
+```
+Now let's wrap the query into a function for easier interactive work. 
+
+```{r}
+semantic_search <- function(query) {
+  q_emb <- model$encode(query)
+  cos_sim <- purrr::map_dbl(book_emb, \(emb) {
+    sum(q_emb * emb) / (sqrt(sum(q_emb^2)) * sqrt(sum(emb^2)))
+  })
+  out <- tibble(title = books$label, cos_sim = cos_sim) |> arrange(desc(cos_sim))
+  out
+  ggplot(out, aes(cos_sim, reorder(title, cos_sim))) +
+    geom_label(aes(label=sub("^0", "", as.character(round(cos_sim, 2)))),
+               fill="navy",
+               color="white",
+               #color="dodgerblue",
+               fontfact="bold",
+               size=6,
+               label.padding=unit(.1, "lines")) +
+    labs(x="Cosine similarity",
+         y="",
+         title=glue::glue("Novel similarity to:\n{query}"))
+}
+```
+
+```{r}
+semantic_search("childhood wonder and adventure")
+```
+I would have expected Alice, then Huck Finn, then Gullivers. I can see the query relating to a deeper theme in Gatsby. 
+
+
+```{r}
+semantic_search("Love and death")
+```
+Shouldn't the first two be Romeo and Gatsby? I can see a deeper tie-in to Frankenstein. 
+
+```{r}
+semantic_search("space the final frontier")
+```
+Looks good
+
+```{r}
+semantic_search("Oh how I would love to do the impossible!")
+```
+I would expect higher rankings for Grimm, Gatsby, and Frankenstein
+
+```{r}
+semantic_search("Why is it so easy for people to hate each other?")
+```
+This query was to see if it picked up on the family feud in Huck Finn. I can see the other rankings but not sure why Alice is up there. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
