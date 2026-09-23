@@ -25,6 +25,22 @@ source("../../../prep (May 2025).r")
 
 ---
 
+# Setup
+
+We need `ggplot2` for visualization and `patchwork` to assemble multi-panel figures. Both are loaded via the prep script — confirm they're available before proceeding.
+
+```{r}
+#| label: setup
+#| eval: false
+
+# Load the two libraries you'll use throughout this exercise.
+# Hint: one for plotting, one for combining plots side-by-side.
+library(___)
+library(___)
+```
+
+---
+
 # Illustration of Data Simulation
 
 We'll start by building intuition for correlation as a geometric concept. The idea: given a desired population correlation $$\rho$$, we can generate a pair of random variables $$(x, y)$$ where $$x$$ is standard normal and $$y$$ is constructed to have exactly that linear relationship with $$x$$, plus independent noise.

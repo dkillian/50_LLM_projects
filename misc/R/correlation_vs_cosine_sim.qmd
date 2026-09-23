@@ -1,0 +1,314 @@
+---
+title: "Correlation vs. Cosine Similarity"
+subtitle: "An R translation of a Mike X Cohen's daily data challenge (Dec 9, 2025)"
+author: "Dan Killian, with Posit AI"
+date: today
+format:
+  html:
+    toc: true
+    code-fold: false
+    theme: cosmo
+execute:
+  warning: false
+  message: false
+---
+
+```{r global_options, include=F, warning=F, message=F, echo=F, error=F}
+library(here)
+library(knitr)
+source("../../../prep (May 2025).r")
+theme_set(base_ppt)
+```
+
+## Background
+
+The goal is to compare cosine similarity and Pearson correlation coefficient in the same data. 
+
+## Exploration
+
+### Pearson correlation
+
+Pearson's correlation is the covariance of two variables, scaled to be bounded between -1 and 1
+
+The covariance of two random variables is the sum of the products of their deviations from their mean. 
+
+$$\frac{\sum(x_i-\bar x)(y_i-\bar y)}{\sqrt{\sum(x_i-\bar x)^2\cdot\sum(y_i-\bar y)^2}}$$
+
+In pseudo-code, we could express it this way: 
+
+```
+x_dev = x - mean(x)
+y_dev = y - mean(y)
+
+r = sum(x_dev * y_dev) / sqrt( sum(x_dev^2) * sum(y_dev^2) )
+```
+
+Let's take a look at this
+
+```{r}
+set.seed(3245432)
+
+x <- rnorm(100, 150, 15)
+y <- rnorm(100, 350, 25)
+
+d <- tibble(x,y)
+
+ggplot(d, aes(x,y)) +
+    geom_point(color="dodgerblue2", 
+               size=.8) +
+    stat_smooth(method="lm",
+                color="dodgerblue2",
+                size=1)
+```
+By construction, x and y are uncorrelated: `r cor(x,y) |> round(2)`
+
+How did we arrive at a correlation of 0.09? 
+
+```{r}
+d <- d %>%
+    mutate(x_dev = round(x - mean(x),1),
+           y_dev = round(y - mean(y),1),
+           product = x_dev * y_dev,
+           x_dev_sq = x_dev^2,
+           y_dev_sq = y_dev^2)
+
+d %>%
+    .[1:10,] %>%
+    flextable()
+```
+
+Now divide the sum of products by the square root of the sum of $x$ squared deviations multiplied by the sum of $y$ squared deviations. 
+
+```{r}
+prodsum <- sum(d$product)
+corr <- prodsum / sqrt(sum(d$x_dev_sq) * sum(d$y_dev_sq))
+
+corr %>% round(2)
+```
+How might we generate correlated variables? We make $y$ a function of $x$ plus random noise. 
+
+```{r}
+y <- 3*x + rnorm(100, 100, 100)
+
+d <- tibble(x,y)
+
+ggplot(d, aes(x,y)) +
+    geom_point(color="dodgerblue2", 
+               size=1,
+               alpha=.6) +
+    stat_smooth(method="lm",
+                color="dodgerblue2",
+                size=1,
+                alpha=.6)
+```
+```{r}
+cor(x,y) %>% round(2)
+```
+```{r}
+d <- d %>%
+    mutate(x_dev = round(x - mean(x),1),
+           y_dev = round(y - mean(y),1),
+           product = x_dev * y_dev,
+           x_dev_sq = x_dev^2,
+           y_dev_sq = y_dev^2)
+
+d %>%
+    .[1:10,] %>%
+    flextable()
+```
+
+```{r}
+prodsum <- sum(d$product)
+corr <- prodsum / sqrt(sum(d$x_dev_sq) * sum(d$y_dev_sq)) 
+corr %>% round(2)
+```
+Pearson correlation works great for linear data. It starts to fail with nonlinear data. 
+
+```{r}
+N <- 90
+
+# Circle
+theta <- seq(0, 2 * pi, length.out = N + 1)[-(N + 1)]  
+# N evenly spaced angles, endpoint excluded to avoid overlap
+
+d1 <- tibble(x = cos(theta), y = sin(theta))
+
+# Parabola
+x <- seq(-2, 2, length.out = N)
+d2 <- tibble(x = x, y = x^2)
+
+# V-shape
+half <- seq(-2, 2, length.out = N %/% 2)
+d3 <- tibble(x = c(half, half), y = c(half, -half))
+
+shapes <- bind_rows(
+  mutate(d1, shape = sprintf("Circle, r = %.2f",    cor(d1$x, d1$y))),
+  mutate(d2, shape = sprintf("Parabola, r = %.2f",  cor(d2$x, d2$y))),
+  mutate(d3, shape = sprintf("V-shape, r = %.2f",   cor(d3$x, d3$y)))
+)
+
+ggplot(shapes, aes(x, y)) +
+  geom_point(color="dodgerblue2",
+            alpha=.8,
+            size = .8) +
+    stat_smooth(method="lm") +
+  facet_wrap(~ shape, scales = "free") +
+  theme(axis.text = element_blank(), axis.ticks = element_blank(),
+        axis.title = element_blank()) +
+    faceted
+```
+### Cosine similarity
+
+Cosine similarity is the product of two random variables divided by the square root of the squared sum of the random variables. 
+
+$\frac{\sum x_iy_i}{\sqrt{\sum x_i^2 \cdot \sum y_i^2}}$
+
+In pseudo-code: 
+
+```
+cos_sim = sum(x * y) / sqrt( sum(x^2) * sum(y^2) )
+```
+
+The Pearson correlation looks at the deviations from means - the data are mean centered, so the location of the data is not considered. Correlation asks whether $y$ is more likely to be above its mean when $x$ is above its mean, and vice versa. 
+
+Cosine similarity looks at the *angle* between two vectors, and the magnitude of the score is the extent to which the data vectors are pointing in the same direction. Magnitude in the data values plays no role, only direction.
+
+What does it mean for two data vectors to have a direction? 
+
+```{r}
+x2   <- c(3, 1)
+y2   <- c(1, 3)
+x_c <- x2 - mean(x2)
+y_c <- y2 - mean(y2)
+
+arrows_df <- bind_rows(
+  tibble(x0=0, y0=0, x1=x2[1],   y1=x2[2],   vec="x", panel="Raw (cosine similarity)"),
+  tibble(x0=0, y0=0, x1=y2[1],   y1=x2[2],   vec="y", panel="Raw (cosine similarity)"),
+  tibble(x0=0, y0=0, x1=x_c[1], y1=x_c[2], vec="x", panel="Centered (correlation)"),
+  tibble(x0=0, y0=0, x1=y_c[1], y1=y_c[2], vec="y", panel="Centered (correlation)")
+)
+
+ggplot(arrows_df, aes(x0, y0, xend=x1, yend=y1, color=vec)) +
+  geom_segment(arrow=arrow(length=unit(0.3, "cm")), linewidth=1) +
+  geom_hline(yintercept=0, color="gray80") +
+  geom_vline(xintercept=0, color="gray80") +
+  coord_equal() +
+  facet_wrap(~panel) +
+  labs(x=NULL, y=NULL, color=NULL, caption="Illustrative, not based on data") +
+    faceted
+```
+
+Note that while correlation looks at mean-centered values, cosine similarity computes on the raw data values. So the relative location of the random variables can affect the similarity score.
+
+What is the  cosine similarity of our data? 
+
+```{r}
+cos_sim <- sum(x * y) / sqrt( sum(x^2) * sum(y^2) )
+cos_sim
+```
+There's not a lot to compare between Peason correlation and cosine similarity. Correlation works for linear data, while cosine similarity measures the angle between two vectors. The main context where the direction of a vector may be meaningful is when a query vector of embeddings is used to retrieve a set of vectors from a reference set of embeddings. In this context, cosine similarity is identifying similarities in extracts of a text corpus. So cosine similarity is a tool used in natural language processing. 
+
+For the purposes of this challenge, the main point is to notice that Pearson correlation uses mean-centered data, while cosine similarity computes on raw data values, and therefore incorporates the location of the mean into the score. The practical effect of this is to draw the similarity score towards 1, and the similarity score and the correlation will diverge. As the mean of the data converges to zero, cosine similarity and correlation essentially become the same thing. 
+
+The challenge will illustrate.  
+
+::: {.column-margin}
+Adding a constant to every element shifts both vectors toward 
+**1** = (1, 1, ..., 1). As the offset grows, both vectors point 
+mostly in that direction — so the angle between them shrinks 
+toward 0, and cosine similarity approaches 1.
+:::
+
+## The Challenge
+
+Here is the challenge:  
+
+::: {.callout-note appearance="minimal"}
+In a for-loop, generate x as 99 random numbers, and y as 99 independent random numbers plus x plus a mean offset. The mean offset varies between -10 and +10 in 91 steps over the 91 iterations of the for-loop. Calculate and store cosine similarity and correlation coefficient, and make a scatter plot of those metrics as a function of the difference of means between the two variables. 
+:::  
+
+We'll take this step by step
+
+> In a for-loop, generate x as 99 random numbers
+
+The reference to a for-loop is for Python. Since R is vectorized, it would not be best practice code so we'll do it in R style. 
+
+```{r}
+set.seed(345)
+x <- rnorm(99)
+```
+
+> ...and y as 99 independent random numbers plus x plus a mean offset. The mean offset varies between -10 and +10 in 91 steps over the 91 iterations of the for-loop. Calculate and store cosine similarity and correlation coefficient...
+
+The for-loop would look like this: 
+
+```{r}
+offsets=seq(-10,10, length.out=91)
+
+out <- tibble(offset=offsets, 
+              cos_sim = rep(NA, 91),
+              corr = rep(NA, 91))
+
+for(i in seq_along(offsets)) {
+    y <- rnorm(99) + x + offsets[i]
+    out$cos_sim[i] = sum(x * y) / sqrt( sum(x^2) * sum(y^2) )
+    out$corr[i] = cor(x,y)
+}
+```
+
+The vectorized version that should be used with R looks like this: 
+
+```{r}
+results <- purrr::map(offsets, \(offset) { # offset stores each iteration of offsets
+  # for every value of offsets, do this: 
+    y <- rnorm(99) + x + offset
+    tibble(
+    offset  = offset,
+    cos_sim = sum(x * y) / sqrt( sum(x^2) * sum(y^2) ),
+    corr    = cor(x, y)
+  )
+}) |> list_rbind() # after every iteration, store it as a row in results
+
+results %>%
+    head() %>%
+    flextable()
+```
+> ...make a scatter plot of those metrics as a function of the difference of means between the two variables
+
+
+```{r}
+ggplot(results, aes(offset)) + 
+    geom_line(aes(y=cos_sim),
+               color="indianred",
+               size=1,
+               alpha=.8) +
+    geom_line(aes(y=corr),
+               color="dodgerblue2",
+               size=1,
+               alpha=.8) +
+    scale_y_continuous(limits=c(-.1,.8),
+                       sec.axis=dup_axis()) +
+    annotate("text", 
+             label="Cosine similarity", 
+             color="indianred",
+             x=-.2,
+             y=.08) +
+    annotate("text",
+             label="Pearson correlation",
+             color="dodgerblue2",
+             x=-.2,
+             y=.12) +
+    labs(x="Mean offset",
+         y="Metric\nvalue",
+         caption="As data become mean-centered, cosine\nsimilarity and correlation converge") +
+    theme(axis.title.y=element_text(angle=0,
+                                    vjust=.4),
+          axis.title.y.right=element_text(angle=0,
+                                          vjust=.4)) 
+
+
+
+```
+
+As the data values approach a mean of zero, the values of correlation and cosine similarity also converge. For centered data, Pearson correlation and cosine similarity give about the same score. 
+

@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Dan Killian, with Posit AI">
+<meta name="dcterms.date" content="2026-09-23">
+
+<title>Correlation vs.&nbsp;Cosine Similarity</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="correlation_vs_cosine_sim_files/libs/clipboard/clipboard.min.js"></script>
+<script src="correlation_vs_cosine_sim_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="correlation_vs_cosine_sim_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="correlation_vs_cosine_sim_files/libs/quarto-html/popper.min.js"></script>
+<script src="correlation_vs_cosine_sim_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="correlation_vs_cosine_sim_files/libs/quarto-html/anchor.min.js"></script>
+<link href="correlation_vs_cosine_sim_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="correlation_vs_cosine_sim_files/libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="correlation_vs_cosine_sim_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="correlation_vs_cosine_sim_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="correlation_vs_cosine_sim_files/libs/bootstrap/bootstrap-67270d1595a62d14f123c043d4fb2f18.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="correlation_vs_cosine_sim_files/libs/tabwid-1.1.3/tabwid.css" rel="stylesheet">
+
+<script src="correlation_vs_cosine_sim_files/libs/tabwid-1.1.3/tabwid.js"></script>
+
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#background" id="toc-background" class="nav-link active" data-scroll-target="#background">Background</a></li>
+  <li><a href="#exploration" id="toc-exploration" class="nav-link" data-scroll-target="#exploration">Exploration</a>
+  <ul class="collapse">
+  <li><a href="#pearson-correlation" id="toc-pearson-correlation" class="nav-link" data-scroll-target="#pearson-correlation">Pearson correlation</a></li>
+  <li><a href="#cosine-similarity" id="toc-cosine-similarity" class="nav-link" data-scroll-target="#cosine-similarity">Cosine similarity</a></li>
+  </ul></li>
+  <li><a href="#the-challenge" id="toc-the-challenge" class="nav-link" data-scroll-target="#the-challenge">The Challenge</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content page-columns page-full" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Correlation vs.&nbsp;Cosine Similarity</h1>
+<p class="subtitle lead">An R translation of a Mike X Cohen’s daily data challenge (Dec 9, 2025)</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Dan Killian, with Posit AI </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">September 23, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="background" class="level2">
+<h2 class="anchored" data-anchor-id="background">Background</h2>
+<p>The goal is to compare cosine similarity and Pearson correlation coefficient in the same data.</p>
+</section>
+<section id="exploration" class="level2 page-columns page-full">
+<h2 class="anchored" data-anchor-id="exploration">Exploration</h2>
+<section id="pearson-correlation" class="level3">
+<h3 class="anchored" data-anchor-id="pearson-correlation">Pearson correlation</h3>
+<p>Pearson’s correlation is the covariance of two variables, scaled to be bounded between -1 and 1</p>
+<p>The covariance of two random variables is the sum of the products of their deviations from their mean.</p>
+<p><span class="math display">\[\frac{\sum(x_i-\bar x)(y_i-\bar y)}{\sqrt{\sum(x_i-\bar x)^2\cdot\sum(y_i-\bar y)^2}}\]</span></p>
+<p>In pseudo-code, we could express it this way:</p>
+<pre><code>x_dev = x - mean(x)
+y_dev = y - mean(y)
+
+r = sum(x_dev * y_dev) / sqrt( sum(x_dev^2) * sum(y_dev^2) )</code></pre>
+<p>Let’s take a look at this</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">3245432</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(<span class="dv">100</span>, <span class="dv">150</span>, <span class="dv">15</span>)</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>y <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(<span class="dv">100</span>, <span class="dv">350</span>, <span class="dv">25</span>)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>d <span class="ot">&lt;-</span> <span class="fu">tibble</span>(x,y)</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(d, <span class="fu">aes</span>(x,y)) <span class="sc">+</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_point</span>(<span class="at">color=</span><span class="st">"dodgerblue2"</span>, </span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>               <span class="at">size=</span>.<span class="dv">8</span>) <span class="sc">+</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stat_smooth</span>(<span class="at">method=</span><span class="st">"lm"</span>,</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>                <span class="at">color=</span><span class="st">"dodgerblue2"</span>,</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>                <span class="at">size=</span><span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="correlation_vs_cosine_sim_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>By construction, x and y are uncorrelated: 0.09</p>
+<p>How did we arrive at a correlation of 0.09?</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>d <span class="ot">&lt;-</span> d <span class="sc">%&gt;%</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">x_dev =</span> <span class="fu">round</span>(x <span class="sc">-</span> <span class="fu">mean</span>(x),<span class="dv">1</span>),</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>           <span class="at">y_dev =</span> <span class="fu">round</span>(y <span class="sc">-</span> <span class="fu">mean</span>(y),<span class="dv">1</span>),</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>           <span class="at">product =</span> x_dev <span class="sc">*</span> y_dev,</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>           <span class="at">x_dev_sq =</span> x_dev<span class="sc">^</span><span class="dv">2</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>           <span class="at">y_dev_sq =</span> y_dev<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>d <span class="sc">%&gt;%</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    .[<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>,] <span class="sc">%&gt;%</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">flextable</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div class="tabwid"><style>.cl-3f2db016{table-layout:auto;}.cl-3f215de8{font-family:'Gill Sans MT';font-size:10pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-3f265618{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-3f26b6b2{background-color:transparent;vertical-align: middle;border-bottom: 1.5pt solid rgba(102, 102, 102, 1.00);border-top: 1.5pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3f26b6c6{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3f26b6d0{background-color:transparent;vertical-align: middle;border-bottom: 1.5pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table data-quarto-disable-processing="true" class="cl-3f2db016"><thead><tr style="overflow-wrap:break-word;"><th class="cl-3f26b6b2"><p class="cl-3f265618"><span class="cl-3f215de8">x</span></p></th><th class="cl-3f26b6b2"><p class="cl-3f265618"><span class="cl-3f215de8">y</span></p></th><th class="cl-3f26b6b2"><p class="cl-3f265618"><span class="cl-3f215de8">x_dev</span></p></th><th class="cl-3f26b6b2"><p class="cl-3f265618"><span class="cl-3f215de8">y_dev</span></p></th><th class="cl-3f26b6b2"><p class="cl-3f265618"><span class="cl-3f215de8">product</span></p></th><th class="cl-3f26b6b2"><p class="cl-3f265618"><span class="cl-3f215de8">x_dev_sq</span></p></th><th class="cl-3f26b6b2"><p class="cl-3f265618"><span class="cl-3f215de8">y_dev_sq</span></p></th></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">165</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">363</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">18.3</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">11.5</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">210.5</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">334.89</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">132.2</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">158</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">315</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">11.3</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">-36.4</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">-411.3</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">127.69</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">1,325.0</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">136</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">371</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">-10.8</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">19.3</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">-208.4</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">116.64</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">372.5</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">152</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">340</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">4.9</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">-12.0</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">-58.8</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">24.01</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">144.0</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">156</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">360</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">9.8</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">7.9</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">77.4</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">96.04</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">62.4</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">126</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">389</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">-20.5</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">37.0</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">-758.5</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">420.25</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">1,369.0</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">144</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">343</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">-2.3</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">-8.3</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">19.1</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">5.29</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">68.9</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">164</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">392</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">17.4</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">39.7</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">690.8</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">302.76</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">1,576.1</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">132</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">374</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">-14.6</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">21.9</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">-319.7</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">213.16</span></p></td><td class="cl-3f26b6c6"><p class="cl-3f265618"><span class="cl-3f215de8">479.6</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3f26b6d0"><p class="cl-3f265618"><span class="cl-3f215de8">170</span></p></td><td class="cl-3f26b6d0"><p class="cl-3f265618"><span class="cl-3f215de8">304</span></p></td><td class="cl-3f26b6d0"><p class="cl-3f265618"><span class="cl-3f215de8">23.4</span></p></td><td class="cl-3f26b6d0"><p class="cl-3f265618"><span class="cl-3f215de8">-47.7</span></p></td><td class="cl-3f26b6d0"><p class="cl-3f265618"><span class="cl-3f215de8">-1,116.2</span></p></td><td class="cl-3f26b6d0"><p class="cl-3f265618"><span class="cl-3f215de8">547.56</span></p></td><td class="cl-3f26b6d0"><p class="cl-3f265618"><span class="cl-3f215de8">2,275.3</span></p></td></tr></tbody></table></div>
+</div>
+</div>
+<p>Now divide the sum of products by the square root of the sum of <span class="math inline">\(x\)</span> squared deviations multiplied by the sum of <span class="math inline">\(y\)</span> squared deviations.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>prodsum <span class="ot">&lt;-</span> <span class="fu">sum</span>(d<span class="sc">$</span>product)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>corr <span class="ot">&lt;-</span> prodsum <span class="sc">/</span> <span class="fu">sqrt</span>(<span class="fu">sum</span>(d<span class="sc">$</span>x_dev_sq) <span class="sc">*</span> <span class="fu">sum</span>(d<span class="sc">$</span>y_dev_sq))</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>corr <span class="sc">%&gt;%</span> <span class="fu">round</span>(<span class="dv">2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0.09</code></pre>
+</div>
+</div>
+<p>How might we generate correlated variables? We make <span class="math inline">\(y\)</span> a function of <span class="math inline">\(x\)</span> plus random noise.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>y <span class="ot">&lt;-</span> <span class="dv">3</span><span class="sc">*</span>x <span class="sc">+</span> <span class="fu">rnorm</span>(<span class="dv">100</span>, <span class="dv">100</span>, <span class="dv">100</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>d <span class="ot">&lt;-</span> <span class="fu">tibble</span>(x,y)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(d, <span class="fu">aes</span>(x,y)) <span class="sc">+</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_point</span>(<span class="at">color=</span><span class="st">"dodgerblue2"</span>, </span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">size=</span><span class="dv">1</span>,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>               <span class="at">alpha=</span>.<span class="dv">6</span>) <span class="sc">+</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stat_smooth</span>(<span class="at">method=</span><span class="st">"lm"</span>,</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>                <span class="at">color=</span><span class="st">"dodgerblue2"</span>,</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>                <span class="at">size=</span><span class="dv">1</span>,</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>                <span class="at">alpha=</span>.<span class="dv">6</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="correlation_vs_cosine_sim_files/figure-html/unnamed-chunk-4-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cor</span>(x,y) <span class="sc">%&gt;%</span> <span class="fu">round</span>(<span class="dv">2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0.41</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>d <span class="ot">&lt;-</span> d <span class="sc">%&gt;%</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">x_dev =</span> <span class="fu">round</span>(x <span class="sc">-</span> <span class="fu">mean</span>(x),<span class="dv">1</span>),</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>           <span class="at">y_dev =</span> <span class="fu">round</span>(y <span class="sc">-</span> <span class="fu">mean</span>(y),<span class="dv">1</span>),</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>           <span class="at">product =</span> x_dev <span class="sc">*</span> y_dev,</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>           <span class="at">x_dev_sq =</span> x_dev<span class="sc">^</span><span class="dv">2</span>,</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>           <span class="at">y_dev_sq =</span> y_dev<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>d <span class="sc">%&gt;%</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    .[<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>,] <span class="sc">%&gt;%</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">flextable</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div class="tabwid"><style>.cl-3fb0a0c0{table-layout:auto;}.cl-3fa49eec{font-family:'Gill Sans MT';font-size:10pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-3fa95d1a{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-3fa99578{background-color:transparent;vertical-align: middle;border-bottom: 1.5pt solid rgba(102, 102, 102, 1.00);border-top: 1.5pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3fa99582{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3fa9958c{background-color:transparent;vertical-align: middle;border-bottom: 1.5pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table data-quarto-disable-processing="true" class="cl-3fb0a0c0"><thead><tr style="overflow-wrap:break-word;"><th class="cl-3fa99578"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">x</span></p></th><th class="cl-3fa99578"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">y</span></p></th><th class="cl-3fa99578"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">x_dev</span></p></th><th class="cl-3fa99578"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">y_dev</span></p></th><th class="cl-3fa99578"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">product</span></p></th><th class="cl-3fa99578"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">x_dev_sq</span></p></th><th class="cl-3fa99578"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">y_dev_sq</span></p></th></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">165</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">506</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">18.3</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-22.2</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-406</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">334.89</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">493</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">158</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">427</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">11.3</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-101.4</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-1,146</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">127.69</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">10,282</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">136</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">560</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-10.8</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">31.6</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-341</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">116.64</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">999</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">152</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">395</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">4.9</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-133.5</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-654</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">24.01</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">17,822</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">156</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">542</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">9.8</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">13.6</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">133</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">96.04</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">185</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">126</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">302</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-20.5</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-226.3</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">4,639</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">420.25</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">51,212</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">144</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">656</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-2.3</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">127.5</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-293</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">5.29</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">16,256</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">164</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">447</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">17.4</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-81.0</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-1,409</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">302.76</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">6,561</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">132</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">363</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-14.6</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">-165.0</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">2,409</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">213.16</span></p></td><td class="cl-3fa99582"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">27,225</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3fa9958c"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">170</span></p></td><td class="cl-3fa9958c"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">687</span></p></td><td class="cl-3fa9958c"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">23.4</span></p></td><td class="cl-3fa9958c"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">159.1</span></p></td><td class="cl-3fa9958c"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">3,723</span></p></td><td class="cl-3fa9958c"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">547.56</span></p></td><td class="cl-3fa9958c"><p class="cl-3fa95d1a"><span class="cl-3fa49eec">25,313</span></p></td></tr></tbody></table></div>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>prodsum <span class="ot">&lt;-</span> <span class="fu">sum</span>(d<span class="sc">$</span>product)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>corr <span class="ot">&lt;-</span> prodsum <span class="sc">/</span> <span class="fu">sqrt</span>(<span class="fu">sum</span>(d<span class="sc">$</span>x_dev_sq) <span class="sc">*</span> <span class="fu">sum</span>(d<span class="sc">$</span>y_dev_sq)) </span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>corr <span class="sc">%&gt;%</span> <span class="fu">round</span>(<span class="dv">2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0.41</code></pre>
+</div>
+</div>
+<p>Pearson correlation works great for linear data. It starts to fail with nonlinear data.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>N <span class="ot">&lt;-</span> <span class="dv">90</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Circle</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>theta <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="dv">0</span>, <span class="dv">2</span> <span class="sc">*</span> pi, <span class="at">length.out =</span> N <span class="sc">+</span> <span class="dv">1</span>)[<span class="sc">-</span>(N <span class="sc">+</span> <span class="dv">1</span>)]  </span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="co"># N evenly spaced angles, endpoint excluded to avoid overlap</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>d1 <span class="ot">&lt;-</span> <span class="fu">tibble</span>(<span class="at">x =</span> <span class="fu">cos</span>(theta), <span class="at">y =</span> <span class="fu">sin</span>(theta))</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Parabola</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="sc">-</span><span class="dv">2</span>, <span class="dv">2</span>, <span class="at">length.out =</span> N)</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>d2 <span class="ot">&lt;-</span> <span class="fu">tibble</span>(<span class="at">x =</span> x, <span class="at">y =</span> x<span class="sc">^</span><span class="dv">2</span>)</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a><span class="co"># V-shape</span></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>half <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="sc">-</span><span class="dv">2</span>, <span class="dv">2</span>, <span class="at">length.out =</span> N <span class="sc">%/%</span> <span class="dv">2</span>)</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>d3 <span class="ot">&lt;-</span> <span class="fu">tibble</span>(<span class="at">x =</span> <span class="fu">c</span>(half, half), <span class="at">y =</span> <span class="fu">c</span>(half, <span class="sc">-</span>half))</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>shapes <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(d1, <span class="at">shape =</span> <span class="fu">sprintf</span>(<span class="st">"Circle, r = %.2f"</span>,    <span class="fu">cor</span>(d1<span class="sc">$</span>x, d1<span class="sc">$</span>y))),</span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(d2, <span class="at">shape =</span> <span class="fu">sprintf</span>(<span class="st">"Parabola, r = %.2f"</span>,  <span class="fu">cor</span>(d2<span class="sc">$</span>x, d2<span class="sc">$</span>y))),</span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(d3, <span class="at">shape =</span> <span class="fu">sprintf</span>(<span class="st">"V-shape, r = %.2f"</span>,   <span class="fu">cor</span>(d3<span class="sc">$</span>x, d3<span class="sc">$</span>y)))</span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(shapes, <span class="fu">aes</span>(x, y)) <span class="sc">+</span></span>
+<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">color=</span><span class="st">"dodgerblue2"</span>,</span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>            <span class="at">alpha=</span>.<span class="dv">8</span>,</span>
+<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>            <span class="at">size =</span> .<span class="dv">8</span>) <span class="sc">+</span></span>
+<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>    <span class="fu">stat_smooth</span>(<span class="at">method=</span><span class="st">"lm"</span>) <span class="sc">+</span></span>
+<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> shape, <span class="at">scales =</span> <span class="st">"free"</span>) <span class="sc">+</span></span>
+<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text =</span> <span class="fu">element_blank</span>(), <span class="at">axis.ticks =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a>        <span class="at">axis.title =</span> <span class="fu">element_blank</span>()) <span class="sc">+</span></span>
+<span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a>    faceted</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="correlation_vs_cosine_sim_files/figure-html/unnamed-chunk-8-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="cosine-similarity" class="level3 page-columns page-full">
+<h3 class="anchored" data-anchor-id="cosine-similarity">Cosine similarity</h3>
+<p>Cosine similarity is the product of two random variables divided by the square root of the squared sum of the random variables.</p>
+<p><span class="math inline">\(\frac{\sum x_iy_i}{\sqrt{\sum x_i^2 \cdot \sum y_i^2}}\)</span></p>
+<p>In pseudo-code:</p>
+<pre><code>cos_sim = sum(x * y) / sqrt( sum(x^2) * sum(y^2) )</code></pre>
+<p>The Pearson correlation looks at the deviations from means - the data are mean centered, so the location of the data is not considered. Correlation asks whether <span class="math inline">\(y\)</span> is more likely to be above its mean when <span class="math inline">\(x\)</span> is above its mean, and vice versa.</p>
+<p>Cosine similarity looks at the <em>angle</em> between two vectors, and the magnitude of the score is the extent to which the data vectors are pointing in the same direction. Magnitude in the data values plays no role, only direction.</p>
+<p>What does it mean for two data vectors to have a direction?</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>x2   <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">1</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>y2   <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">3</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>x_c <span class="ot">&lt;-</span> x2 <span class="sc">-</span> <span class="fu">mean</span>(x2)</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>y_c <span class="ot">&lt;-</span> y2 <span class="sc">-</span> <span class="fu">mean</span>(y2)</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>arrows_df <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tibble</span>(<span class="at">x0=</span><span class="dv">0</span>, <span class="at">y0=</span><span class="dv">0</span>, <span class="at">x1=</span>x2[<span class="dv">1</span>],   <span class="at">y1=</span>x2[<span class="dv">2</span>],   <span class="at">vec=</span><span class="st">"x"</span>, <span class="at">panel=</span><span class="st">"Raw (cosine similarity)"</span>),</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tibble</span>(<span class="at">x0=</span><span class="dv">0</span>, <span class="at">y0=</span><span class="dv">0</span>, <span class="at">x1=</span>y2[<span class="dv">1</span>],   <span class="at">y1=</span>x2[<span class="dv">2</span>],   <span class="at">vec=</span><span class="st">"y"</span>, <span class="at">panel=</span><span class="st">"Raw (cosine similarity)"</span>),</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tibble</span>(<span class="at">x0=</span><span class="dv">0</span>, <span class="at">y0=</span><span class="dv">0</span>, <span class="at">x1=</span>x_c[<span class="dv">1</span>], <span class="at">y1=</span>x_c[<span class="dv">2</span>], <span class="at">vec=</span><span class="st">"x"</span>, <span class="at">panel=</span><span class="st">"Centered (correlation)"</span>),</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tibble</span>(<span class="at">x0=</span><span class="dv">0</span>, <span class="at">y0=</span><span class="dv">0</span>, <span class="at">x1=</span>y_c[<span class="dv">1</span>], <span class="at">y1=</span>y_c[<span class="dv">2</span>], <span class="at">vec=</span><span class="st">"y"</span>, <span class="at">panel=</span><span class="st">"Centered (correlation)"</span>)</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(arrows_df, <span class="fu">aes</span>(x0, y0, <span class="at">xend=</span>x1, <span class="at">yend=</span>y1, <span class="at">color=</span>vec)) <span class="sc">+</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_segment</span>(<span class="at">arrow=</span><span class="fu">arrow</span>(<span class="at">length=</span><span class="fu">unit</span>(<span class="fl">0.3</span>, <span class="st">"cm"</span>)), <span class="at">linewidth=</span><span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_hline</span>(<span class="at">yintercept=</span><span class="dv">0</span>, <span class="at">color=</span><span class="st">"gray80"</span>) <span class="sc">+</span></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_vline</span>(<span class="at">xintercept=</span><span class="dv">0</span>, <span class="at">color=</span><span class="st">"gray80"</span>) <span class="sc">+</span></span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_equal</span>() <span class="sc">+</span></span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>panel) <span class="sc">+</span></span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x=</span><span class="cn">NULL</span>, <span class="at">y=</span><span class="cn">NULL</span>, <span class="at">color=</span><span class="cn">NULL</span>, <span class="at">caption=</span><span class="st">"Illustrative, not based on data"</span>) <span class="sc">+</span></span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>    faceted</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="correlation_vs_cosine_sim_files/figure-html/unnamed-chunk-9-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Note that while correlation looks at mean-centered values, cosine similarity computes on the raw data values. So the relative location of the random variables can affect the similarity score.</p>
+<p>What is the cosine similarity of our data?</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>cos_sim <span class="ot">&lt;-</span> <span class="fu">sum</span>(x <span class="sc">*</span> y) <span class="sc">/</span> <span class="fu">sqrt</span>( <span class="fu">sum</span>(x<span class="sc">^</span><span class="dv">2</span>) <span class="sc">*</span> <span class="fu">sum</span>(y<span class="sc">^</span><span class="dv">2</span>) )</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>cos_sim</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] -0.133</code></pre>
+</div>
+</div>
+<p>There’s not a lot to compare between Peason correlation and cosine similarity. Correlation works for linear data, while cosine similarity measures the angle between two vectors. The main context where the direction of a vector may be meaningful is when a query vector of embeddings is used to retrieve a set of vectors from a reference set of embeddings. In this context, cosine similarity is identifying similarities in extracts of a text corpus. So cosine similarity is a tool used in natural language processing.</p>
+<p>For the purposes of this challenge, the main point is to notice that Pearson correlation uses mean-centered data, while cosine similarity computes on raw data values, and therefore incorporates the location of the mean into the score. The practical effect of this is to draw the similarity score towards 1, and the similarity score and the correlation will diverge. As the mean of the data converges to zero, cosine similarity and correlation essentially become the same thing.</p>
+<p>The challenge will illustrate.</p>
+
+<div class="no-row-height column-margin column-container"><div class="">
+<p>Adding a constant to every element shifts both vectors toward <strong>1</strong> = (1, 1, …, 1). As the offset grows, both vectors point mostly in that direction — so the angle between them shrinks toward 0, and cosine similarity approaches 1.</p>
+</div></div></section>
+</section>
+<section id="the-challenge" class="level2">
+<h2 class="anchored" data-anchor-id="the-challenge">The Challenge</h2>
+<p>Here is the challenge:</p>
+<div class="callout callout-style-simple callout-note no-icon">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-body-container">
+<p>In a for-loop, generate x as 99 random numbers, and y as 99 independent random numbers plus x plus a mean offset. The mean offset varies between -10 and +10 in 91 steps over the 91 iterations of the for-loop. Calculate and store cosine similarity and correlation coefficient, and make a scatter plot of those metrics as a function of the difference of means between the two variables.</p>
+</div>
+</div>
+</div>
+<p>We’ll take this step by step</p>
+<blockquote class="blockquote">
+<p>In a for-loop, generate x as 99 random numbers</p>
+</blockquote>
+<p>The reference to a for-loop is for Python. Since R is vectorized, it would not be best practice code so we’ll do it in R style.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">345</span>)</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(<span class="dv">99</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<blockquote class="blockquote">
+<p>…and y as 99 independent random numbers plus x plus a mean offset. The mean offset varies between -10 and +10 in 91 steps over the 91 iterations of the for-loop. Calculate and store cosine similarity and correlation coefficient…</p>
+</blockquote>
+<p>The for-loop would look like this:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>offsets<span class="ot">=</span><span class="fu">seq</span>(<span class="sc">-</span><span class="dv">10</span>,<span class="dv">10</span>, <span class="at">length.out=</span><span class="dv">91</span>)</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>out <span class="ot">&lt;-</span> <span class="fu">tibble</span>(<span class="at">offset=</span>offsets, </span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>              <span class="at">cos_sim =</span> <span class="fu">rep</span>(<span class="cn">NA</span>, <span class="dv">91</span>),</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>              <span class="at">corr =</span> <span class="fu">rep</span>(<span class="cn">NA</span>, <span class="dv">91</span>))</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(i <span class="cf">in</span> <span class="fu">seq_along</span>(offsets)) {</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>    y <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(<span class="dv">99</span>) <span class="sc">+</span> x <span class="sc">+</span> offsets[i]</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>    out<span class="sc">$</span>cos_sim[i] <span class="ot">=</span> <span class="fu">sum</span>(x <span class="sc">*</span> y) <span class="sc">/</span> <span class="fu">sqrt</span>( <span class="fu">sum</span>(x<span class="sc">^</span><span class="dv">2</span>) <span class="sc">*</span> <span class="fu">sum</span>(y<span class="sc">^</span><span class="dv">2</span>) )</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>    out<span class="sc">$</span>corr[i] <span class="ot">=</span> <span class="fu">cor</span>(x,y)</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>The vectorized version that should be used with R looks like this:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>results <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map</span>(offsets, \(offset) { <span class="co"># offset stores each iteration of offsets</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># for every value of offsets, do this: </span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    y <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(<span class="dv">99</span>) <span class="sc">+</span> x <span class="sc">+</span> offset</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tibble</span>(</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">offset  =</span> offset,</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">cos_sim =</span> <span class="fu">sum</span>(x <span class="sc">*</span> y) <span class="sc">/</span> <span class="fu">sqrt</span>( <span class="fu">sum</span>(x<span class="sc">^</span><span class="dv">2</span>) <span class="sc">*</span> <span class="fu">sum</span>(y<span class="sc">^</span><span class="dv">2</span>) ),</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">corr    =</span> <span class="fu">cor</span>(x, y)</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>}) <span class="sc">|&gt;</span> <span class="fu">list_rbind</span>() <span class="co"># after every iteration, store it as a row in results</span></span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>results <span class="sc">%&gt;%</span></span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">head</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">flextable</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div class="tabwid"><style>.cl-4079e6c4{table-layout:auto;}.cl-4070a352{font-family:'Gill Sans MT';font-size:10pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-407460d2{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-407492dc{background-color:transparent;vertical-align: middle;border-bottom: 1.5pt solid rgba(102, 102, 102, 1.00);border-top: 1.5pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-407492e6{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-407492e7{background-color:transparent;vertical-align: middle;border-bottom: 1.5pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table data-quarto-disable-processing="true" class="cl-4079e6c4"><thead><tr style="overflow-wrap:break-word;"><th class="cl-407492dc"><p class="cl-407460d2"><span class="cl-4070a352">offset</span></p></th><th class="cl-407492dc"><p class="cl-407460d2"><span class="cl-4070a352">cos_sim</span></p></th><th class="cl-407492dc"><p class="cl-407460d2"><span class="cl-4070a352">corr</span></p></th></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">-10.00</span></p></td><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">0.175</span></p></td><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">0.740</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">-9.78</span></p></td><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">0.175</span></p></td><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">0.731</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">-9.56</span></p></td><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">0.143</span></p></td><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">0.578</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">-9.33</span></p></td><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">0.183</span></p></td><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">0.743</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">-9.11</span></p></td><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">0.171</span></p></td><td class="cl-407492e6"><p class="cl-407460d2"><span class="cl-4070a352">0.710</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-407492e7"><p class="cl-407460d2"><span class="cl-4070a352">-8.89</span></p></td><td class="cl-407492e7"><p class="cl-407460d2"><span class="cl-4070a352">0.160</span></p></td><td class="cl-407492e7"><p class="cl-407460d2"><span class="cl-4070a352">0.623</span></p></td></tr></tbody></table></div>
+</div>
+</div>
+<blockquote class="blockquote">
+<p>…make a scatter plot of those metrics as a function of the difference of means between the two variables</p>
+</blockquote>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(results, <span class="fu">aes</span>(offset)) <span class="sc">+</span> </span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">y=</span>cos_sim),</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>               <span class="at">color=</span><span class="st">"indianred"</span>,</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>               <span class="at">size=</span><span class="dv">1</span>,</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>               <span class="at">alpha=</span>.<span class="dv">8</span>) <span class="sc">+</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">y=</span>corr),</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">color=</span><span class="st">"dodgerblue2"</span>,</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>               <span class="at">size=</span><span class="dv">1</span>,</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>               <span class="at">alpha=</span>.<span class="dv">8</span>) <span class="sc">+</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">scale_y_continuous</span>(<span class="at">limits=</span><span class="fu">c</span>(<span class="sc">-</span>.<span class="dv">1</span>,.<span class="dv">8</span>),</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>                       <span class="at">sec.axis=</span><span class="fu">dup_axis</span>()) <span class="sc">+</span></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">annotate</span>(<span class="st">"text"</span>, </span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>             <span class="at">label=</span><span class="st">"Cosine similarity"</span>, </span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>             <span class="at">color=</span><span class="st">"indianred"</span>,</span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>             <span class="at">x=</span><span class="sc">-</span>.<span class="dv">2</span>,</span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a>             <span class="at">y=</span>.<span class="dv">08</span>) <span class="sc">+</span></span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a>    <span class="fu">annotate</span>(<span class="st">"text"</span>,</span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a>             <span class="at">label=</span><span class="st">"Pearson correlation"</span>,</span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a>             <span class="at">color=</span><span class="st">"dodgerblue2"</span>,</span>
+<span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a>             <span class="at">x=</span><span class="sc">-</span>.<span class="dv">2</span>,</span>
+<span id="cb20-21"><a href="#cb20-21" aria-hidden="true" tabindex="-1"></a>             <span class="at">y=</span>.<span class="dv">12</span>) <span class="sc">+</span></span>
+<span id="cb20-22"><a href="#cb20-22" aria-hidden="true" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">x=</span><span class="st">"Mean offset"</span>,</span>
+<span id="cb20-23"><a href="#cb20-23" aria-hidden="true" tabindex="-1"></a>         <span class="at">y=</span><span class="st">"Metric</span><span class="sc">\n</span><span class="st">value"</span>,</span>
+<span id="cb20-24"><a href="#cb20-24" aria-hidden="true" tabindex="-1"></a>         <span class="at">caption=</span><span class="st">"As data become mean-centered, cosine</span><span class="sc">\n</span><span class="st">similarity and correlation converge"</span>) <span class="sc">+</span></span>
+<span id="cb20-25"><a href="#cb20-25" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme</span>(<span class="at">axis.title.y=</span><span class="fu">element_text</span>(<span class="at">angle=</span><span class="dv">0</span>,</span>
+<span id="cb20-26"><a href="#cb20-26" aria-hidden="true" tabindex="-1"></a>                                    <span class="at">vjust=</span>.<span class="dv">4</span>),</span>
+<span id="cb20-27"><a href="#cb20-27" aria-hidden="true" tabindex="-1"></a>          <span class="at">axis.title.y.right=</span><span class="fu">element_text</span>(<span class="at">angle=</span><span class="dv">0</span>,</span>
+<span id="cb20-28"><a href="#cb20-28" aria-hidden="true" tabindex="-1"></a>                                          <span class="at">vjust=</span>.<span class="dv">4</span>)) </span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="correlation_vs_cosine_sim_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As the data values approach a mean of zero, the values of correlation and cosine similarity also converge. For centered data, Pearson correlation and cosine similarity give about the same score.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

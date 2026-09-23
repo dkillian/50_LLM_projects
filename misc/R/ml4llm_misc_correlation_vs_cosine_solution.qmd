@@ -1,0 +1,180 @@
+---
+title: "Correlation vs. Cosine Similarity"
+subtitle: "50 ML Projects to Understand LLMs — Miscellaneous (Solution)<br>R translation of Mike X Cohen's Substack post"
+author: "Dan Killian, with Posit AI<br>an R translation of Mike X Cohen's original Python notebook"
+date: today
+format:
+  html:
+    toc: true
+    code-fold: false
+    theme: cosmo
+execute:
+  warning: false
+  message: false
+---
+
+*Using the code without reading the post may lead to confusion or errors.*
+
+---
+
+```{r global_options, include=F, warning=F, message=F, echo=F, error=F}
+library(here)
+library(knitr)
+source("../../../prep (May 2025).r")
+```
+
+---
+
+# Setup
+
+```{r}
+#| label: setup
+library(ggplot2)
+library(patchwork)
+```
+
+---
+
+# Illustration of Data Simulation
+
+```{r}
+#| label: fig-sim-illustration
+#| fig-width: 10
+#| fig-height: 3.5
+
+set.seed(4271)
+
+pop_cors <- c(-.7, 0, .7)
+N        <- 90
+
+plots <- lapply(pop_cors, function(rho) {
+
+  x <- rnorm(N)
+  y <- x * rho + rnorm(N) * sqrt(1 - rho^2)
+
+  r  <- cor(x, y)
+  df <- data.frame(x = x, y = y)
+
+  ggplot(df, aes(x, y)) +
+    geom_point() +
+    labs(
+      x     = 'Data "x"',
+      y     = 'Data "y"',
+      title = sprintf("Correlation = %.2f", r)
+    )
+})
+
+wrap_plots(plots, nrow = 1)
+```
+
+---
+
+# Correlations Can Mislead
+
+```{r}
+#| label: fig-misleading-cors
+#| fig-width: 10
+#| fig-height: 3.5
+
+N <- 90
+
+make_shape <- function(shape_id) {
+
+  if (shape_id == 1) {
+    theta <- seq(0, 2 * pi, length.out = N + 1)[-(N + 1)]
+    x <- cos(theta)
+    y <- sin(theta)
+
+  } else if (shape_id == 2) {
+    x <- seq(-2, 2, length.out = N)
+    y <- x^2
+
+  } else {
+    half <- seq(-2, 2, length.out = N %/% 2)
+    x <- c(half, half)
+    y <- c(half, -half)
+  }
+
+  r <- cor(x, y)
+  data.frame(x = x, y = y, r = r, shape = shape_id)
+}
+
+shapes <- lapply(1:3, make_shape)
+
+plots <- lapply(shapes, function(df) {
+  ggplot(df, aes(x, y)) +
+    geom_point() +
+    labs(title = sprintf("r = %.2f", df$r[1])) +
+    theme(axis.text = element_blank(), axis.ticks = element_blank(),
+          axis.title = element_blank())
+})
+
+wrap_plots(plots, nrow = 1)
+```
+
+---
+
+# Systematic Comparison of Correlation and Cosine Similarity
+
+```{r}
+#| label: fig-systematic-comparison
+#| fig-width: 10
+#| fig-height: 4
+
+set.seed(8813)
+
+pop_rs <- seq(-1, 1, length.out = 100)
+N      <- 500
+
+results <- lapply(pop_rs, function(rho) {
+
+  x <- rnorm(N)
+  y <- x * rho + rnorm(N) * sqrt(1 - rho^2)
+
+  x <- x - 10  # mean offset
+
+  # Pearson correlation (manual formula)
+  x_c  <- x - mean(x)
+  y_c  <- y - mean(y)
+  x_ss <- sum(x_c^2)
+  y_ss <- sum(y_c^2)
+  r    <- sum(x_c * y_c) / sqrt(x_ss * y_ss)
+
+  # Cosine similarity (manual formula)
+  x_ss2 <- sum(x^2)
+  y_ss2 <- sum(y^2)
+  cos_s <- sum(x * y) / sqrt(x_ss2 * y_ss2)
+
+  data.frame(pop_r = rho, pearson = r, cosine = cos_s)
+})
+
+res <- do.call(rbind, results)
+
+p1 <- ggplot(res, aes(x = pop_r)) +
+  geom_point(aes(y = pearson, shape = "Correlation")) +
+  geom_point(aes(y = cosine,  shape = "Cosine sim.")) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray60") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray60") +
+  scale_shape_manual(values = c("Correlation" = 15, "Cosine sim." = 16)) +
+  labs(
+    x     = "Population correlation",
+    y     = expression("Measured " * italic(r) * " or " * italic(S[C])),
+    title = "Correlation and cosine sim.",
+    shape = NULL
+  )
+
+r_between <- cor(res$pearson, res$cosine)
+
+p2 <- ggplot(res, aes(x = pearson, y = cosine)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray60") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray60") +
+  coord_cartesian(xlim = c(-1.1, 1.1), ylim = c(-1.1, 1.1)) +
+  labs(
+    x     = "Correlation",
+    y     = "Cosine similarity",
+    title = sprintf("r = %.2f", r_between)
+  )
+
+p1 | p2
+```
