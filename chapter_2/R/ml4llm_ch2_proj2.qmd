@@ -332,9 +332,11 @@ semantic_search <- function(query) {
                fontfact="bold",
                size=6,
                label.padding=unit(.1, "lines")) +
+      scale_x_continuous(sec.axis=dup_axis()) +
     labs(x="Cosine similarity",
          y="",
-         title=glue::glue("Novel similarity to:\n{query}"))
+         title=glue::glue("Novel similarity to:\n{query}")) +
+      theme(axis.title.x.top=element_blank())
 }
 ```
 
