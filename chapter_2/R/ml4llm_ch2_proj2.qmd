@@ -329,7 +329,7 @@ semantic_search <- function(query) {
                fill="navy",
                color="white",
                #color="dodgerblue",
-               fontfact="bold",
+               fontface="bold",
                size=6,
                label.padding=unit(.1, "lines")) +
       scale_x_continuous(sec.axis=dup_axis()) +
