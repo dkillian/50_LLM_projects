@@ -9,5 +9,5 @@ Project 1: [Three Tokenization Schemes](https://dkillian.github.io/50_LLM_projec
 
 Project 2: [Book lengths in characters, words, tokens](https://dkillian.github.io/50_LLM_projects/chapter_2/R/ml4llm_ch2_proj2.html)
 
-Miscellaneous data challenges
+Miscellaneous data challenges  
 [Pearson correlation vs. cosine similarity](https://dkillian.github.io/50_LLM_projects/misc/R/correlation_vs_cosine_sim.html)
